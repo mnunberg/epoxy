@@ -15,15 +15,14 @@ public:
      * @param cmd The command to dispatch
      * @return true on success, false on error
      */
-    bool dispatch(Command *cmd);
+    void dispatch(Command *cmd);
     void flushQueue();
 
 private:
     lcb_t instance;
     lcb_io_opt_t io;
     /** Queued command objects for when the instance is not yet bootstrapped */
-    std::vector<Command *> cmdQueue;
-
+    std::list<Command *> cmdQueue;
     /** Reference count */
     size_t refcount;
 };

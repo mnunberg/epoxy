@@ -57,6 +57,14 @@ BufferPool::BufferPool()
     itemBlockSize = 4096;
 }
 
+BufferPool::~BufferPool()
+{
+    while (!buffers.empty()) {
+        buffers.back()->tryRelase(this);
+        buffers.pop_back();
+    }
+}
+
 Buffer *
 BufferPool::get(size_t n)
 {

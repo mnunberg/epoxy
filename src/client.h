@@ -40,40 +40,27 @@ public:
 
     /** Read relevant commands and dispatch them */
     void slurp();
-    void checkError();
+    void checkError(int rv, int errcur);
     void ref() { refcount++; }
     void unref() { if (!--refcount) { delete this; } }
-    void schedule() {
-        if (!entered) {
-            scheduleNocheck();
-        }
-    }
+    void schedule() { if (!entered) { scheduleNocheck(); } }
 
 private:
     void createCommands();
     void scheduleNocheck();
-
     bool peek(char *buf, size_t n);
     void consume(size_t n);
+    void closeSock();
 
-    /** Send queue - items to write to downstream */
-    std::list<BufPair> sendQueue;
-    Rope *rope;
-
-    /** Parent object. Contains buffer pool, among other things */
-    Daemon *parent;
-
-    /** Socket descriptor */
-    int sockfd;
-
-    /** Reference count for client */
-    size_t refcount;
-    ev_io watcher;
-    short watchedFor;
-    struct sockaddr_in inaddr;
-    std::string idstr;
-    bool entered;
-    bool closed;
+    std::list<BufPair> sendQueue; /** Send queue - items to write to downstream */
+    Rope *rope; /**< Buffer used for incoming data */
+    Daemon *parent; /**< Parent object. Contains buffer pool, among other things */
+    int sockfd; /**< Socket descriptor */
+    ev_io watcher; /**< Watcher for I/O */
+    short watchedFor; /**< Current watcher flags */
+    size_t refcount; /**< Reference count for client. Closed when 0 */
+    bool entered; /**< Inside an event handler? */
+    bool closed; /**< Whether this socket has an error */
 };
 
 }//namespace

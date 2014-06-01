@@ -2,18 +2,29 @@
 #define LCBPROXY_DAEMON_H
 #include "common.h"
 #include "buffer.h"
-#include <ev.h>
-#include <map>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 
 namespace Epoxy {
 class LCBHandle;
 
 struct Daemon {
 public:
+    Daemon(const std::string& bname, int lsnport);
+    void run();
+    void acceptClient();
     BufferPool pool;
     std::list<LCBHandle *> handles;
+    LCBHandle * getHandle();
+    struct ev_loop * getLoop() const { return loop; }
+
+private:
+    void reschedule();
+    int lsnfd;
+    ev_io watcher;
+    struct sockaddr_in lsnaddr;
+    const std::string bucket;
     struct ev_loop *loop;
-    LCBHandle* getHandle();
 };
 
 }//namespace

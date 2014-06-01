@@ -4,6 +4,7 @@
 #include "command.h"
 #include "daemon.h"
 #include "bufpair.h"
+#include <errno.h>
 
 using namespace Epoxy;
 using std::string;
@@ -28,7 +29,7 @@ EnteredContext::~EnteredContext()
 extern "C" {
 
 static void
-watcher_cb(struct ev_loop *l, ev_io *io, int events)
+watcher_cb(struct ev_loop *, ev_io *io, int events)
 {
     Client *client = (Client*)io->data;
     EnteredContext ctx(client);
@@ -55,6 +56,12 @@ Client::Client(Daemon *d, int fd)
     ev_init(&watcher, watcher_cb);
 }
 
+Client::~Client()
+{
+    closeSock();
+    delete rope;
+}
+
 void
 Client::scheduleNocheck()
 {
@@ -68,9 +75,9 @@ Client::scheduleNocheck()
     }
 
     if (watchedFor != wanted) {
-        ev_io_stop(parent->loop, &watcher);
+        ev_io_stop(parent->getLoop(), &watcher);
         ev_io_set(&watcher, sockfd, wanted);
-        ev_io_start(parent->loop, &watcher);
+        ev_io_start(parent->getLoop(), &watcher);
         watchedFor = wanted;
     }
 }
@@ -93,7 +100,7 @@ Client::drain()
     ssize_t nw = sendmsg(sockfd, &mh, 0);
 
     if (nw < 1) {
-        checkError();
+        checkError(nw, errno);
         schedule();
     }
 
@@ -120,7 +127,7 @@ Client::slurp()
     mh.msg_iovlen = EPOXY_NREAD_IOV;
     ssize_t nr = recvmsg(sockfd, &mh, 0);
     if (nr <= 0) {
-        checkError();
+        checkError(nr, errno);
     }
 
     rope->setReadAdded(rctx, nr);
@@ -145,6 +152,7 @@ Client::slurp()
             cmd = new PayloadCommand(hdr, rope);
         }
         parent->getHandle()->dispatch(cmd);
+        ref();
     }
 
     schedule();
@@ -166,6 +174,7 @@ Client::gotResponse(Command *cmd, lcb_PKTFWDRESP* resp)
         lcb_backbuf_ref(resp->bufs[ii]);
     }
     schedule();
+    unref();
 }
 
 void
@@ -179,4 +188,36 @@ Client::gotResponse(Command *cmd, lcb_error_t err)
     hdr.response.status = htons(PROTOCOL_BINARY_RESPONSE_ETMPFAIL);
     sendQueue.push_back(BufPair((char*)hdr.bytes, sizeof hdr.bytes));
     schedule();
+    unref();
+}
+
+void
+Client::closeSock()
+{
+    if (sockfd < 0) {
+        return;
+    }
+
+    if (watchedFor) {
+        ev_io_stop(parent->getLoop(), &watcher);
+    }
+    close(sockfd);
+    sockfd = -1;
+    closed = true;
+}
+
+void
+Client::checkError(int rv, int errcurr)
+{
+    if (rv == 0) {
+        closeSock();
+    } else if (rv == -1) {
+        switch (errcurr) {
+        case EWOULDBLOCK:
+        case EINTR:
+            return;
+        default:
+            closeSock();
+        }
+    }
 }

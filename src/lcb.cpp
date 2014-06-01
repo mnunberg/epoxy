@@ -36,7 +36,6 @@ flushed_callback(lcb_t instance, const void *cookie)
     Command *cmd = (Command *)cookie;
     cmd->maybeDestroy();
 }
-
 }
 
 
@@ -44,6 +43,9 @@ LCBHandle::LCBHandle(const string& host, const std::string& bucket, struct ev_lo
 {
     lcb_create_st cropts;
     lcb_create_io_ops_st io_cropts;
+
+    memset(&cropts, 0, sizeof cropts);
+    memset(&io_cropts, 0, sizeof io_cropts);
 
     cropts.version = 2;
     cropts.v.v2.bucket = bucket.c_str();
@@ -61,3 +63,30 @@ LCBHandle::LCBHandle(const string& host, const std::string& bucket, struct ev_lo
     lcb_connect(instance);
 }
 
+void
+LCBHandle::dispatch(Command *cmd)
+{
+    if (lcb_get_bootstrap_status(instance) != LCB_SUCCESS) {
+        // Add to queue
+        cmdQueue.push_back(cmd);
+    } else {
+        lcb_CMDPKTFWD fwdcmd;
+        memset(&fwdcmd, 0, sizeof fwdcmd);
+        lcb_error_t rv;
+        cmd->makeLcbBuf(fwdcmd);
+        lcb_sched_enter(instance);
+        rv = lcb_pktfwd3(instance, cmd, &fwdcmd);
+        assert(rv == LCB_SUCCESS);
+        lcb_sched_leave(instance);
+    }
+}
+
+void
+LCBHandle::flushQueue()
+{
+    assert(lcb_get_bootstrap_status(instance) == LCB_SUCCESS);
+    while (!cmdQueue.empty()) {
+        dispatch(cmdQueue.front());
+        cmdQueue.pop_front();
+    }
+}
