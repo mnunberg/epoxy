@@ -1,0 +1,13 @@
+SET(_LCB_ROOT_HINTS ${LCB_ROOT})
+
+MESSAGE(STATUS "HINTS: ${_LCB_ROOT_HINTS}")
+FIND_PATH(LCB_INST_DIR NAMES include/libcouchbase/couchbase.h HINTS ${_LCB_ROOT_HINTS})
+
+MESSAGE(STATUS "Found install: ${LCB_INST_DIR}")
+
+FIND_PATH(LCB_INCLUDE_DIR
+    NAMES libcouchbase/couchbase.h
+    HINTS ${_LCB_ROOT_HINTS} ${LCB_INST_DIR}/include)
+
+FIND_LIBRARY(LCB_DSO NAMES couchbase libcouchbase
+    HINTS ${LCB_INST_DIR}/lib ${_LCB_ROOT_HINTS} ${_LCB_ROOT_HINTS}/lib)
