@@ -39,6 +39,7 @@ static void
 flushed_callback(lcb_t instance, const void *cookie)
 {
     Command *cmd = (Command *)cookie;
+    cmd->setFlushed();
     cmd->maybeDestroy();
 }
 }

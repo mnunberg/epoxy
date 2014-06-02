@@ -51,7 +51,7 @@ class PayloadCommand : public Command {
 public:
     PayloadCommand(const RequestHeader&, Rope *rope);
     virtual void makeLcbBuf(lcb_CMDPKTFWD&);
-    virtual void maybeDestroy() { if (received && flushed) { delete this; } }
+    virtual void maybeDestroy();
     virtual void setFlushed() { flushed = true; }
 
 private:

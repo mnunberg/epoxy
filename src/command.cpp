@@ -51,3 +51,16 @@ PayloadCommand::makeLcbBuf(lcb_CMDPKTFWD& cmd)
     cmd.vb.u_buf.multi.iov = (lcb_IOV *)&iov[0];
     cmd.vb.u_buf.multi.niov = iov.size();
 }
+
+void
+PayloadCommand::maybeDestroy()
+{
+    if (! (flushed && received)) {
+        return;
+    }
+
+    for (size_t ii = 0; ii < iov.size(); ++ii) {
+        buffers[ii]->unref();
+    }
+    delete this;
+}
