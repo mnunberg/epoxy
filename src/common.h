@@ -8,6 +8,9 @@
 #include <list>
 #include <vector>
 #include <string>
+extern "C" {
+#include "logging/epoxy_yolog.h"
+}
 
 #define EPOXY_NREAD_IOV 16
 #define EPOXY_NWRITE_IOV 32

@@ -3,13 +3,14 @@ using namespace Epoxy;
 using std::vector;
 using std::list;
 
-Buffer::Buffer(size_t n)
+Buffer::Buffer(size_t n, BufferPool *parent)
 {
     ndata = 0;
-    refcount = 0;
+    refcount = 1;
     allocated = n;
     offset = 0;
     data = new char[allocated];
+    this->parent = parent;
 }
 
 Buffer::~Buffer()
@@ -23,6 +24,15 @@ Buffer::clear()
     ndata = 0;
     refcount = 0;
     offset = 0;
+}
+
+void
+Buffer::unref()
+{
+    if (--refcount) {
+        return;
+    }
+    parent->put(this);
 }
 
 void
@@ -40,17 +50,6 @@ Buffer::added(size_t n)
     return n;
 }
 
-void
-Buffer::tryRelase(BufferPool *pool)
-{
-    if (ndata > 0) {
-        return;
-    }
-    if (!refcount) {
-        pool->put(this);
-    }
-}
-
 BufferPool::BufferPool()
 {
     itemCapacity = 32;
@@ -60,7 +59,7 @@ BufferPool::BufferPool()
 BufferPool::~BufferPool()
 {
     while (!buffers.empty()) {
-        buffers.back()->tryRelase(this);
+        buffers.front()->unref();
         buffers.pop_back();
     }
 }
@@ -72,7 +71,7 @@ BufferPool::get(size_t n)
         n = itemBlockSize;
     }
     if (n != itemBlockSize || buffers.empty()) {
-        return new Buffer(n);
+        return new Buffer(n, this);
     }
 
     while (!buffers.empty()) {
@@ -117,7 +116,7 @@ Rope::getContig(char *s, size_t n)
         // Copy the data
         size_t toCopy = std::min(n, (*ii)->size());
         if (toCopy) {
-            memcpy(s, (*ii)->data, toCopy);
+            memcpy(s, (*ii)->getReadHead(), toCopy);
             n -= toCopy;
             s += toCopy;
         }
@@ -133,7 +132,7 @@ Rope::getFrags(size_t n, vector<Buffer*>& ubufs, vector<iovec>& uiov)
         size_t toAssign = std::min(n, (*ii)->size());
         if (toAssign) {
             iovec iovcur;
-            iovcur.iov_base = (*ii)->data + (*ii)->offset;
+            iovcur.iov_base = (*ii)->getReadHead();
             iovcur.iov_len = toAssign;
             uiov.push_back(iovcur);
             ubufs.push_back(*ii);
@@ -145,29 +144,24 @@ void
 Rope::getReadBuffers(ReadContext& ctx)
 {
     Buffer *lastBuf = bufs.back();
-    iovec *iov_p;
-    Buffer **buf_p;
+    iovec *iov_p = ctx.iov;
+    Buffer **buf_p = ctx.bk;
+    size_t nremaining = EPOXY_NREAD_IOV;
 
-    size_t nremaining;
-
-    if (lastBuf->capacity() > 0) {
-        ctx.iov[0].iov_base = lastBuf->data + lastBuf->offset;
-        ctx.iov[0].iov_len = lastBuf->capacity();
+    if (bufs.empty() == false && lastBuf->capacity() > 0) {
+        lastBuf->fillIovec(ctx.iov[0]);
         ctx.bk[0] = lastBuf;
-        nremaining = EPOXY_NREAD_IOV - 1;
-        iov_p = &ctx.iov[1];
-        buf_p = &ctx.bk[1];
-        ctx.chopFirst = true;
 
-    } else {
-        nremaining = EPOXY_NREAD_IOV;
-        iov_p = &ctx.iov[0];
-        buf_p = &ctx.bk[0];
+        nremaining--;
+        iov_p++;
+        buf_p++;
+        ctx.chopFirst = true;
     }
+
     for (unsigned ii = 0; ii < nremaining; ++ii) {
         Buffer *buf = bp->get();
-        iov_p[ii].iov_base = buf->data;
-        iov_p[ii].iov_len = buf->capacity();
+        assert(buf);
+        buf->fillIovec(iov_p[ii]);
         buf_p[ii] = buf;
     }
 }
@@ -197,10 +191,11 @@ Rope::consumed(size_t n)
         buf->consumed(toConsume);
         if (buf->empty()) {
             bufs.pop_front();
-            buf->tryRelase(bp);
+            buf->unref();
         }
         n -= toConsume;
     }
+    assert(n == 0);
 }
 
 size_t

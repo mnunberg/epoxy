@@ -1,6 +1,7 @@
 #ifndef LCBPROXY_CLIENT_H
 #define LCBPROXY_CLIENT_H
 #include "common.h"
+#include "command.h"
 #include <list>
 #include <ev.h>
 #include <arpa/inet.h>
@@ -51,6 +52,10 @@ private:
     bool peek(char *buf, size_t n);
     void consume(size_t n);
     void closeSock();
+    void sendConfigBlob(const RequestHeader&);
+    void sendSaslMechs(const RequestHeader&);
+    void sendError(const RequestHeader&, uint16_t);
+    bool readCommand();
 
     std::list<BufPair> sendQueue; /** Send queue - items to write to downstream */
     Rope *rope; /**< Buffer used for incoming data */

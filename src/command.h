@@ -38,14 +38,12 @@ protected:
 
 class SmallCommand : public Command {
 public:
-    static const int maxPacketSize = 64;
-
     SmallCommand(const RequestHeader&, Rope *rope);
     virtual void makeLcbBuf(lcb_CMDPKTFWD&);
     virtual void maybeDestroy() { if (received) { delete this; } }
 
 private:
-    char buf[maxPacketSize];
+    char buf[EPOXY_SMALLCMD_MAXSZ];
     size_t packetSize;
 };
 
@@ -80,7 +78,13 @@ getPacketSize(const RequestHeader& hdr)
     return sz;
 }
 
-
+static inline void
+makeResponseTemplate(ResponseHeader& res, const RequestHeader& req)
+{
+    res.response.opcode = req.request.opcode;
+    res.response.magic = PROTOCOL_BINARY_RES;
+    res.response.opaque = req.request.opaque;
+}
 
 } //namespace
 

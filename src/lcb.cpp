@@ -1,6 +1,7 @@
 #include "lcb.h"
 #include "command.h"
 #include "client.h"
+#include <cstdio>
 
 using namespace Epoxy;
 using std::string;
@@ -11,9 +12,13 @@ extern "C"
 static void
 bootstrap_callback(lcb_t instance, lcb_error_t err)
 {
-    assert(err == LCB_SUCCESS);
+    if (err != LCB_SUCCESS) {
+        log_lcbt_crit("Couldn't bootstrap! 0x%x (%s)", err, lcb_strerror(NULL, err));
+        abort();
+    }
     LCBHandle *handle = (LCBHandle *)lcb_get_cookie(instance);
     handle->flushQueue();
+    log_lcbt_info("Bootstrapped instance %p", instance);
 }
 
 static void
@@ -76,7 +81,9 @@ LCBHandle::dispatch(Command *cmd)
         cmd->makeLcbBuf(fwdcmd);
         lcb_sched_enter(instance);
         rv = lcb_pktfwd3(instance, cmd, &fwdcmd);
-        assert(rv == LCB_SUCCESS);
+        if (rv != LCB_SUCCESS) {
+            log_lcbt_error("Got error during dispatch: 0x%x (%s)", rv, lcb_strerror(instance, rv));
+        }
         lcb_sched_leave(instance);
     }
 }

@@ -37,13 +37,17 @@ PayloadCommand::PayloadCommand(const RequestHeader& hdr, Rope* rope) :
 {
     size_t pktsize = ntohl(hdr.request.bodylen) + sizeof hdr.bytes;
     rope->getFrags(pktsize, buffers, iov);
+    for (size_t ii = 0; ii < buffers.size(); ++ii) {
+        buffers[ii]->ref();
+    }
+    rope->consumed(pktsize);
     flushed = false;
 }
 
 void
 PayloadCommand::makeLcbBuf(lcb_CMDPKTFWD& cmd)
 {
-    cmd.vb.vtype = LCB_KV_CONTIG;
+    cmd.vb.vtype = LCB_KV_IOV;
     cmd.vb.u_buf.multi.iov = (lcb_IOV *)&iov[0];
     cmd.vb.u_buf.multi.niov = iov.size();
 }

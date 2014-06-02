@@ -8,11 +8,13 @@
 namespace Epoxy {
 class LCBHandle;
 
-struct Daemon {
+class Daemon {
 public:
     Daemon(const std::string& bname, int lsnport);
     void run();
     void acceptClient();
+    const std::string& getConfigBlob() const { return jsonConfig; }
+
     BufferPool pool;
     std::list<LCBHandle *> handles;
     LCBHandle * getHandle();
@@ -20,11 +22,13 @@ public:
 
 private:
     void reschedule();
+    void genConfig();
     int lsnfd;
     ev_io watcher;
     struct sockaddr_in lsnaddr;
     const std::string bucket;
     struct ev_loop *loop;
+    std::string jsonConfig;
 };
 
 }//namespace

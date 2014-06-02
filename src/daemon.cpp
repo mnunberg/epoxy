@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <cassert>
+#include <libcouchbase/vbucket.h>
 
 using namespace Epoxy;
 using std::string;
@@ -41,7 +42,14 @@ Daemon::acceptClient()
             abort();
         }
     }
-    Client *c = new Client(this, newfd);
+
+    int rv = fcntl(newfd, F_SETFL, fcntl(newfd, F_GETFL)|O_NONBLOCK);
+    if (rv != 0) {
+        log_accept_crit("Couldn't set socket to nonblocking");
+        abort();
+    }
+
+    new Client(this, newfd);
     reschedule();
 }
 
@@ -52,9 +60,10 @@ Daemon::Daemon(const string& bname, int lsnport) :bucket(bname)
     lsnaddr.sin_addr.s_addr = INADDR_ANY;
     lsnaddr.sin_family = AF_INET;
     lsnaddr.sin_port = htons((uint16_t)lsnport);
-    lsnfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-    if (lsnfd == -1) {
+    lsnfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (lsnfd < 0) {
+        log_accept_crit("Couldn't create socket [%d] %s", errno, strerror(errno));
         abort();
     }
 
@@ -75,15 +84,18 @@ Daemon::Daemon(const string& bname, int lsnport) :bucket(bname)
 
     ev_io_init(&watcher, accept_callback, lsnfd, EV_READ);
     ev_io_start(loop, &watcher);
+    watcher.data = this;
 
     // Create our instance
     LCBHandle *handle = new LCBHandle("localhost", bucket, loop);
     handles.push_back(handle);
+    genConfig();
 }
 
 void
 Daemon::run()
 {
+    log_accept_info("Starting event loop");
     ev_loop(loop, 0);
 }
 
@@ -91,4 +103,24 @@ LCBHandle *
 Daemon::getHandle()
 {
     return handles.front();
+}
+
+void
+Daemon::genConfig()
+{
+
+    int rv;
+    lcbvb_CONFIG *vbc = lcbvb_create();
+    lcbvb_SERVER dummy;
+
+    memset(&dummy, 0, sizeof dummy);
+    dummy.hostname = (char *)"localhost";
+    dummy.svc.data = ntohs(lsnaddr.sin_port);
+
+    rv = lcbvb_genconfig_ex(vbc, bucket.c_str(), NULL, &dummy, 1, 0, 1);
+    assert(rv == 0);
+    char *configStr = lcbvb_save_json(vbc);
+    jsonConfig = configStr;
+    free(configStr);
+    lcbvb_destroy(vbc);
 }

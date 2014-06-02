@@ -5,7 +5,13 @@ namespace Epoxy {
 
 class BufPair {
 public:
-    BufPair(const char *s, size_t n);
+    enum Buftype {
+        BACKBUF,
+        COPY,
+        STATIC
+    };
+
+    BufPair(const char *s, size_t n, Buftype = COPY);
     BufPair(lcb_IOV& iov, lcb_BACKBUF bk);
     size_t consumed(size_t total);
     bool empty() const { return iov.iov_len == 0; }
@@ -15,9 +21,13 @@ public:
         iovout->iov_base = iov.iov_base;
     }
 private:
-    lcb_BACKBUF bk;
+    union {
+        lcb_BACKBUF bk;
+        char *buf;
+    };
+
     lcb_IOV iov;
-    bool isMalloced;
+    Buftype type;
 };
 
 } //namespace

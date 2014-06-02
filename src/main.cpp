@@ -14,6 +14,7 @@ int main(int argc, char **argv)
     p.addOption(&optPort);
     p.parse(argc, argv);
 
+    epoxy_yolog_init(NULL);
     Daemon d(optBucket.result(), optPort.result());
     d.run();
     return 0;

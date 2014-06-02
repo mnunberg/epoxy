@@ -1,12 +1,18 @@
 #include "bufpair.h"
 using namespace Epoxy;
 
-BufPair::BufPair(const char *s, size_t n)
+BufPair::BufPair(const char *s, size_t n, Buftype type)
 {
-    isMalloced = true;
-    bk = (lcb_BACKBUF) malloc(n);
-    memcpy((void *)bk, s, n);
-    iov.iov_base = (void*)bk;
+    this->type = type;
+    assert(type != BACKBUF);
+    if (type == COPY) {
+        buf = new char[n];
+        memcpy(buf, s, n);
+    } else {
+        buf = (char*)s;
+    }
+
+    iov.iov_base = buf;
     iov.iov_len = n;
 }
 
@@ -14,7 +20,7 @@ BufPair::BufPair(lcb_IOV& iov, lcb_BACKBUF bk)
 {
     this->bk = bk;
     this->iov = iov;
-    isMalloced = false;
+    this->type = BACKBUF;
 }
 
 size_t
@@ -31,9 +37,9 @@ BufPair::consumed(size_t n)
 void
 BufPair::release()
 {
-    if (isMalloced) {
-        free(bk);
-    } else {
+    if (type == BACKBUF) {
         lcb_backbuf_unref(bk);
+    } else if (type == COPY) {
+        delete[] buf;
     }
 }
