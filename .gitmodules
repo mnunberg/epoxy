@@ -1,0 +1,3 @@
+[submodule "contrib/cliopts"]
+	path = contrib/cliopts
+	url = git://github.com/mnunberg/cliopts.git
