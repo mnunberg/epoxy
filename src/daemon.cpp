@@ -53,7 +53,7 @@ Daemon::acceptClient()
     reschedule();
 }
 
-Daemon::Daemon(const string& bname, int lsnport) :bucket(bname)
+Daemon::Daemon(const string& dsn, int lsnport) : dsn(dsn)
 {
     loop = ev_default_loop(0);
     memset(&lsnaddr, 0, sizeof lsnaddr);
@@ -87,7 +87,7 @@ Daemon::Daemon(const string& bname, int lsnport) :bucket(bname)
     watcher.data = this;
 
     // Create our instance
-    LCBHandle *handle = new LCBHandle("localhost", bucket, loop);
+    LCBHandle *handle = new LCBHandle(dsn, loop);
     handles.push_back(handle);
     genConfig();
 }
@@ -108,7 +108,6 @@ Daemon::getHandle()
 void
 Daemon::genConfig()
 {
-
     int rv;
     lcbvb_CONFIG *vbc = lcbvb_create();
     lcbvb_SERVER dummy;
@@ -117,7 +116,7 @@ Daemon::genConfig()
     dummy.hostname = (char *)"localhost";
     dummy.svc.data = ntohs(lsnaddr.sin_port);
 
-    rv = lcbvb_genconfig_ex(vbc, bucket.c_str(), NULL, &dummy, 1, 0, 1);
+    rv = lcbvb_genconfig_ex(vbc, "default", NULL, &dummy, 1, 0, 1);
     assert(rv == 0);
     char *configStr = lcbvb_save_json(vbc);
     jsonConfig = configStr;

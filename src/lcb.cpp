@@ -45,7 +45,7 @@ flushed_callback(lcb_t instance, const void *cookie)
 }
 
 
-LCBHandle::LCBHandle(const string& host, const std::string& bucket, struct ev_loop *loop)
+LCBHandle::LCBHandle(const string& dsn, struct ev_loop *loop)
 {
     lcb_create_st cropts;
     lcb_create_io_ops_st io_cropts;
@@ -53,14 +53,13 @@ LCBHandle::LCBHandle(const string& host, const std::string& bucket, struct ev_lo
     memset(&cropts, 0, sizeof cropts);
     memset(&io_cropts, 0, sizeof io_cropts);
 
-    cropts.version = 2;
-    cropts.v.v2.bucket = bucket.c_str();
-    cropts.v.v2.host = host.c_str();
-
     io_cropts.v.v0.cookie = loop;
     io_cropts.v.v0.type = LCB_IO_OPS_LIBEV;
     lcb_create_io_ops(&io, &io_cropts);
-    cropts.v.v2.io = io;
+
+    cropts.version = 3;
+    cropts.v.v3.dsn = dsn.c_str();
+    cropts.v.v3.io = io;
     lcb_create(&instance, &cropts);
     lcb_set_cookie(instance, this);
     lcb_set_bootstrap_callback(instance, bootstrap_callback);

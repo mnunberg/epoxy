@@ -26,8 +26,8 @@ private:
     int lsnfd;
     ev_io watcher;
     struct sockaddr_in lsnaddr;
-    const std::string bucket;
     struct ev_loop *loop;
+    const std::string dsn;
     std::string jsonConfig;
 };
 

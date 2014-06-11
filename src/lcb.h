@@ -8,7 +8,7 @@ class Command;
 
 class LCBHandle {
 public:
-    LCBHandle(const std::string& host, const std::string& bucket, struct ev_loop *loop);
+    LCBHandle(const std::string& dsn, struct ev_loop *loop);
     ~LCBHandle() {}
     /**
      * Dispatch a command and await a response
